@@ -5,7 +5,7 @@
 
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IStorageService, StorageScope } from '../../../../platform/storage/common/storage.js';
-import { IWorkbenchLayoutService, Parts } from '../../../services/layout/browser/layoutService.js';
+import { IWorkbenchLayoutService, Parts, ActivityBarPosition, LayoutSettings } from '../../../services/layout/browser/layoutService.js';
 import { IEditorGroupsService } from '../../../services/editor/common/editorGroupsService.js';
 import { IMobileSidebarEditorInputService } from './editors/mobileSidebarInput.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
@@ -176,9 +176,15 @@ export class MobileSidebarController extends Disposable {
 		// Clear mobile mode flag
 		this.mobileSidebarService.setMobileMode(false);
 
-		// Show normal sidebar and activity bar
+		// Show normal sidebar
 		this.layoutService.setPartHidden(false, Parts.SIDEBAR_PART);
-		this.layoutService.setPartHidden(false, Parts.ACTIVITYBAR_PART);
+
+		// Only show activity bar if it's not positioned at top or bottom
+		// When activity bar is at top/bottom, it's shown as part of the title bar area, not as a separate pane
+		const activityBarPosition = this.configurationService.getValue<ActivityBarPosition>(LayoutSettings.ACTIVITY_BAR_LOCATION);
+		if (activityBarPosition !== ActivityBarPosition.TOP && activityBarPosition !== ActivityBarPosition.BOTTOM) {
+			this.layoutService.setPartHidden(false, Parts.ACTIVITYBAR_PART);
+		}
 
 		// Only close the mobile sidebar editor if we're actually on desktop (not just mode disabled)
 		const isMobile = this.isMobileScreen();
