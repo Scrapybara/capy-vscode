@@ -40,7 +40,7 @@ export class MobileSidebarWidget extends Disposable {
 		@IViewDescriptorService private readonly viewDescriptorService: IViewDescriptorService,
 		@IContextKeyService _contextKeyService: IContextKeyService,
 		@IViewsService _viewsService: IViewsService,
-		@ICommandService _commandService: ICommandService,
+		@ICommandService private readonly commandService: ICommandService,
 		@IStorageService private readonly storageService: IStorageService,
 		@IPaneCompositePartService private readonly paneCompositeService: IPaneCompositePartService
 	) {
@@ -192,6 +192,35 @@ export class MobileSidebarWidget extends Disposable {
 
 			actionBar.appendChild(button);
 		});
+
+		const terminalButton = document.createElement('div');
+		terminalButton.className = 'action-item';
+		terminalButton.setAttribute('role', 'button');
+		terminalButton.setAttribute('aria-label', 'Open Terminal in Editor Area');
+		terminalButton.setAttribute('tabindex', '0');
+		terminalButton.setAttribute('title', 'Open Terminal in Editor Area');
+
+		const terminalIconContainer = document.createElement('div');
+		terminalIconContainer.className = 'action-label';
+
+		const terminalIcon = document.createElement('div');
+		terminalIcon.className = 'codicon codicon-terminal';
+		terminalIconContainer.appendChild(terminalIcon);
+
+		terminalButton.appendChild(terminalIconContainer);
+
+		terminalButton.addEventListener('click', async () => {
+			await this.commandService.executeCommand('workbench.action.createTerminalEditor');
+		});
+
+		terminalButton.addEventListener('keydown', async (e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				await this.commandService.executeCommand('workbench.action.createTerminalEditor');
+			}
+		});
+
+		actionBar.appendChild(terminalButton);
 	}
 
 	private async showViewlet(viewletId: string): Promise<void> {
