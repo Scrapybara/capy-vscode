@@ -22,6 +22,8 @@ import { IPaneCompositePartService } from '../../../../services/panecomposite/br
 
 export class MobileSidebarWidget extends Disposable {
 
+	private static readonly LAST_ACTIVE_VIEWLET_KEY = 'workbench.mobileSidebar.lastActiveViewlet';
+
 	private container: HTMLElement;
 	private activityBarContainer: HTMLElement;
 	private contentContainer: HTMLElement;
@@ -68,6 +70,39 @@ export class MobileSidebarWidget extends Disposable {
 		this.container.appendChild(this.contentContainer);
 
 		this.createActivityBar();
+
+		// Restore the last active viewlet on initialization
+		this.restoreLastActiveViewlet();
+	}
+
+	private restoreLastActiveViewlet(): void {
+		const lastActiveViewlet = this.storageService.get(MobileSidebarWidget.LAST_ACTIVE_VIEWLET_KEY, 1 /* WORKSPACE */);
+
+		if (lastActiveViewlet) {
+			// Verify it's still a valid viewlet
+			const viewContainers = this.viewDescriptorService.getViewContainersByLocation(ViewContainerLocation.Sidebar);
+			const isValid = viewContainers.some(container => container.id === lastActiveViewlet);
+
+			if (isValid) {
+				console.log('[MobileSidebar] Initial restore of last active viewlet:', lastActiveViewlet);
+				this.showViewlet(lastActiveViewlet);
+				return;
+			}
+		}
+
+		// If no stored viewlet or it's invalid, show the first pinned viewlet
+		const pinnedViewletIds = this.getPinnedViewletIds();
+		if (pinnedViewletIds.length > 0) {
+			console.log('[MobileSidebar] No stored viewlet, showing first pinned:', pinnedViewletIds[0]);
+			this.showViewlet(pinnedViewletIds[0]);
+		} else {
+			// Fallback to first available container
+			const viewContainers = this.viewDescriptorService.getViewContainersByLocation(ViewContainerLocation.Sidebar);
+			if (viewContainers.length > 0) {
+				console.log('[MobileSidebar] No pinned viewlets, showing first available:', viewContainers[0].id);
+				this.showViewlet(viewContainers[0].id);
+			}
+		}
 	}
 
 	private createActivityBar(): void {
@@ -173,6 +208,9 @@ export class MobileSidebarWidget extends Disposable {
 		this.currentViewletId = viewletId;
 		console.log('[MobileSidebar] Switching to viewlet:', viewletId);
 
+		// Store the active viewlet for persistence
+		this.storageService.store(MobileSidebarWidget.LAST_ACTIVE_VIEWLET_KEY, viewletId, 1 /* WORKSPACE */, 1 /* MACHINE */);
+
 		// Clear previous content
 		this.contentContainer.innerHTML = '';
 
@@ -235,8 +273,18 @@ export class MobileSidebarWidget extends Disposable {
 	}
 
 	private updateActiveButton(viewletId: string): void {
-		const buttons = this.activityBarContainer.querySelectorAll('.action-item');
-		const viewContainers = this.viewDescriptorService.getViewContainersByLocation(ViewContainerLocation.Sidebar);
+		const buttons = this.activityBarContainer.querySelectorAll('.action-item:not(.menu-button)');
+		const pinnedViewletIds = this.getPinnedViewletIds();
+		const allContainers = this.viewDescriptorService.getViewContainersByLocation(ViewContainerLocation.Sidebar);
+
+		// Get containers in the order they're displayed (matching createActivityBar logic)
+		let viewContainers = pinnedViewletIds
+			.map(id => allContainers.find(c => c.id === id))
+			.filter(c => c !== undefined) as typeof allContainers;
+
+		if (viewContainers.length === 0) {
+			viewContainers = allContainers;
+		}
 
 		buttons.forEach((button, index) => {
 			button.classList.remove('checked');
@@ -247,7 +295,22 @@ export class MobileSidebarWidget extends Disposable {
 	}
 
 	refresh(): void {
-		// Try to show the currently active viewlet from the normal sidebar if any
+		// First, try to restore the last active viewlet from storage
+		const lastActiveViewlet = this.storageService.get(MobileSidebarWidget.LAST_ACTIVE_VIEWLET_KEY, 1 /* WORKSPACE */);
+
+		if (lastActiveViewlet) {
+			// Verify it's still a valid viewlet
+			const viewContainers = this.viewDescriptorService.getViewContainersByLocation(ViewContainerLocation.Sidebar);
+			const isValid = viewContainers.some(container => container.id === lastActiveViewlet);
+
+			if (isValid) {
+				console.log('[MobileSidebar] Restoring last active viewlet from storage:', lastActiveViewlet);
+				this.showViewlet(lastActiveViewlet);
+				return;
+			}
+		}
+
+		// If no stored viewlet or it's invalid, try to show the currently active viewlet from the normal sidebar
 		const activeComposite = this.paneCompositeService.getActivePaneComposite(ViewContainerLocation.Sidebar);
 		if (activeComposite) {
 			const activeViewletId = activeComposite.getId();

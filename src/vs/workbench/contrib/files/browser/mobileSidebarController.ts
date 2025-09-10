@@ -12,6 +12,8 @@ import { IInstantiationService } from '../../../../platform/instantiation/common
 import { Event, Emitter } from '../../../../base/common/event.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { EventType, addDisposableListener, getActiveWindow } from '../../../../base/browser/dom.js';
+import { IPaneCompositePartService } from '../../../services/panecomposite/browser/panecomposite.js';
+import { ViewContainerLocation } from '../../../common/views.js';
 
 const MOBILE_SIDEBAR_MODE_STORAGE_KEY = 'workbench.mobileSidebar.enabled';
 
@@ -28,7 +30,8 @@ export class MobileSidebarController extends Disposable {
 		@IEditorGroupsService private readonly editorGroupService: IEditorGroupsService,
 		@IMobileSidebarEditorInputService private readonly mobileSidebarService: IMobileSidebarEditorInputService,
 		@IInstantiationService _instantiationService: IInstantiationService,
-		@IConfigurationService private readonly configurationService: IConfigurationService
+		@IConfigurationService private readonly configurationService: IConfigurationService,
+		@IPaneCompositePartService private readonly paneCompositeService: IPaneCompositePartService
 	) {
 		super();
 
@@ -97,6 +100,13 @@ export class MobileSidebarController extends Disposable {
 	private async applyMobileLayout(): Promise<void> {
 		// Set mobile mode flag
 		this.mobileSidebarService.setMobileMode(true);
+
+		// First, close any active composite in the desktop sidebar to prevent conflicts
+		const activeComposite = this.paneCompositeService.getActivePaneComposite(ViewContainerLocation.Sidebar);
+		if (activeComposite) {
+			console.log('[MobileSidebarController] Closing desktop sidebar composite:', activeComposite.getId());
+			this.paneCompositeService.hideActivePaneComposite(ViewContainerLocation.Sidebar);
+		}
 
 		// Hide normal sidebar and activity bar
 		this.layoutService.setPartHidden(true, Parts.SIDEBAR_PART);

@@ -24,7 +24,7 @@
 /* Activity Bar Container */
 .mobile-sidebar-activity-bar {
 	width: 100%;
-	height: 32px;
+	height: 44px;
 	background-color: var(--vscode-activityBar-background);
 	border-bottom: 1px solid var(--vscode-activityBar-border);
 	flex-shrink: 0;
@@ -39,6 +39,7 @@
 	flex-direction: row;
 	align-items: center;
 	padding: 0 5px;
+	gap: 8px;
 }
 
 /* Activity Bar Action Items */
@@ -52,22 +53,6 @@
 	position: relative;
 }
 
-/* Menu Button Specific Styling */
-.mobile-sidebar-activity-bar .menu-button {
-	margin-right: 8px;
-	position: relative;
-}
-
-.mobile-sidebar-activity-bar .menu-button::after {
-	content: "";
-	position: absolute;
-	right: -4px;
-	top: 8px;
-	bottom: 8px;
-	width: 1px;
-	background-color: var(--vscode-activityBar-border);
-}
-
 .mobile-sidebar-activity-bar .action-item .action-label {
 	display: flex;
 	align-items: center;
@@ -77,7 +62,7 @@
 }
 
 .mobile-sidebar-activity-bar .action-item .codicon {
-	font-size: 24px;
+	font-size: 20px;
 	color: var(--vscode-activityBar-inactiveForeground);
 }
 

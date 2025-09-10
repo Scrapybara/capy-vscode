@@ -17,9 +17,9 @@ import { ServiceCollection } from '../../../../../platform/instantiation/common/
  */
 export class EmbeddedCompositeHost extends Disposable {
 
-	private composites = new Map<string, { composite: PaneComposite; container: HTMLElement }>();
+	private composites = new Map<string, { composite: PaneComposite; container: HTMLElement; disposables: DisposableStore }>();
 	private currentCompositeId: string | undefined;
-	private readonly compositeDisposables = this._register(new DisposableStore());
+	private creatingComposites = new Set<string>();
 
 	constructor(
 		private readonly container: HTMLElement,
@@ -33,12 +33,22 @@ export class EmbeddedCompositeHost extends Disposable {
 	}
 
 	async openComposite(compositeId: string): Promise<PaneComposite | undefined> {
+		// Prevent concurrent creation of the same composite
+		if (this.creatingComposites.has(compositeId)) {
+			console.log(`[EmbeddedCompositeHost] Composite ${compositeId} is already being created`);
+			return undefined;
+		}
+
 		// If same composite, just show it again
 		if (this.currentCompositeId === compositeId) {
 			const existing = this.composites.get(compositeId);
-			if (existing) {
+			if (existing && !existing.disposables.isDisposed) {
 				this.showComposite(compositeId);
 				return existing.composite;
+			}
+			// If it was disposed, remove it from the map
+			if (existing) {
+				this.composites.delete(compositeId);
 			}
 		}
 
@@ -64,9 +74,13 @@ export class EmbeddedCompositeHost extends Disposable {
 
 		// Check if composite already exists
 		const existing = this.composites.get(compositeId);
-		if (existing) {
+		if (existing && !existing.disposables.isDisposed) {
 			this.showComposite(compositeId);
 			return existing.composite;
+		}
+		// If it was disposed, remove it from the map
+		if (existing) {
+			this.composites.delete(compositeId);
 		}
 
 		// Get composite descriptor
@@ -78,6 +92,12 @@ export class EmbeddedCompositeHost extends Disposable {
 			return undefined;
 		}
 
+		// Mark as creating
+		this.creatingComposites.add(compositeId);
+
+		let disposables: DisposableStore | undefined;
+		let compositeContainer: HTMLElement | undefined;
+
 		try {
 			// Create the composite
 			const composite = await this.createComposite(descriptor);
@@ -86,21 +106,35 @@ export class EmbeddedCompositeHost extends Disposable {
 				return undefined;
 			}
 
+			// Create a disposable store for this composite
+			disposables = new DisposableStore();
+
+			// Register the composite itself for disposal
+			disposables.add(composite);
+
 			// Create container for composite
-			const compositeContainer = document.createElement('div');
+			compositeContainer = document.createElement('div');
 			compositeContainer.className = 'composite embedded-composite';
 			compositeContainer.id = compositeId;
 			compositeContainer.style.display = 'none'; // Start hidden
 
-			// Let composite create its UI
-			composite.create(compositeContainer);
-			composite.updateStyles();
+			try {
+				// Let composite create its UI
+				composite.create(compositeContainer);
+				composite.updateStyles();
+			} catch (createError) {
+				// If create fails, dispose everything we've created
+				console.error(`[EmbeddedCompositeHost] Failed to create UI for composite ${compositeId}:`, createError);
+				disposables.dispose();
+				compositeContainer.remove();
+				throw createError;
+			}
 
 			// Add to our container
 			this.container.appendChild(compositeContainer);
 
-			// Store the composite
-			this.composites.set(compositeId, { composite, container: compositeContainer });
+			// Store the composite with its disposables
+			this.composites.set(compositeId, { composite, container: compositeContainer, disposables });
 
 			// Show it
 			this.showComposite(compositeId);
@@ -110,7 +144,19 @@ export class EmbeddedCompositeHost extends Disposable {
 
 		} catch (error) {
 			console.error(`[EmbeddedCompositeHost] Failed to create composite ${compositeId}:`, error);
+
+			// Clean up any resources that were created
+			if (disposables) {
+				disposables.dispose();
+			}
+			if (compositeContainer && compositeContainer.parentElement) {
+				compositeContainer.remove();
+			}
+
 			return undefined;
+		} finally {
+			// Always remove from creating set
+			this.creatingComposites.delete(compositeId);
 		}
 	}
 
@@ -167,6 +213,27 @@ export class EmbeddedCompositeHost extends Disposable {
 		entry.container.style.display = 'none';
 	}
 
+	disposeComposite(compositeId: string): void {
+		const entry = this.composites.get(compositeId);
+		if (!entry) {
+			return;
+		}
+
+		// Hide first
+		if (this.currentCompositeId === compositeId) {
+			this.hideComposite(compositeId);
+			this.currentCompositeId = undefined;
+		}
+
+		// Dispose the composite and its resources
+		entry.composite.setVisible(false);
+		entry.disposables.dispose();
+		entry.container.remove();
+
+		// Remove from our map
+		this.composites.delete(compositeId);
+	}
+
 	layout(dimension: Dimension): void {
 		if (this.currentCompositeId) {
 			const entry = this.composites.get(this.currentCompositeId);
@@ -180,13 +247,10 @@ export class EmbeddedCompositeHost extends Disposable {
 		// Dispose all composites
 		for (const [_, entry] of this.composites) {
 			entry.composite.setVisible(false);
-			entry.composite.dispose();
+			entry.disposables.dispose(); // This will dispose the composite
 			entry.container.remove();
 		}
 		this.composites.clear();
-
-		// Clear disposables
-		this.compositeDisposables.clear();
 
 		super.dispose();
 	}
