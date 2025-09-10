@@ -15,8 +15,6 @@ import { IContextKeyService } from '../../../../../platform/contextkey/common/co
 import { IViewsService } from '../../../../services/views/common/viewsService.js';
 import { Event, Emitter } from '../../../../../base/common/event.js';
 import { ICommandService } from '../../../../../platform/commands/common/commands.js';
-import { MenuId } from '../../../../../platform/actions/common/actions.js';
-import { IContextMenuService } from '../../../../../platform/contextview/browser/contextView.js';
 import { EmbeddedCompositeHost } from './embeddedCompositeHost.js';
 import { IPaneCompositePartService } from '../../../../services/panecomposite/browser/panecomposite.js';
 
@@ -40,11 +38,10 @@ export class MobileSidebarWidget extends Disposable {
 		@IWorkbenchLayoutService _layoutService: IWorkbenchLayoutService,
 		@IThemeService _themeService: IThemeService,
 		@IViewDescriptorService private readonly viewDescriptorService: IViewDescriptorService,
-		@IContextKeyService private readonly contextKeyService: IContextKeyService,
+		@IContextKeyService _contextKeyService: IContextKeyService,
 		@IViewsService _viewsService: IViewsService,
 		@ICommandService _commandService: ICommandService,
 		@IStorageService private readonly storageService: IStorageService,
-		@IContextMenuService private readonly contextMenuService: IContextMenuService,
 		@IPaneCompositePartService private readonly paneCompositeService: IPaneCompositePartService
 	) {
 		super();
@@ -132,9 +129,6 @@ export class MobileSidebarWidget extends Disposable {
 		actionBar.style.display = 'flex';
 		actionBar.style.flexDirection = 'row';
 		this.activityBarContainer.appendChild(actionBar);
-
-		// Add menu button first
-		this.createMenuButton(actionBar);
 
 		// Add buttons for each view container
 		console.log('[MobileSidebar] Creating buttons for', viewContainers.length, 'containers');
@@ -273,7 +267,7 @@ export class MobileSidebarWidget extends Disposable {
 	}
 
 	private updateActiveButton(viewletId: string): void {
-		const buttons = this.activityBarContainer.querySelectorAll('.action-item:not(.menu-button)');
+		const buttons = this.activityBarContainer.querySelectorAll('.action-item');
 		const pinnedViewletIds = this.getPinnedViewletIds();
 		const allContainers = this.viewDescriptorService.getViewContainersByLocation(ViewContainerLocation.Sidebar);
 
@@ -378,52 +372,6 @@ export class MobileSidebarWidget extends Disposable {
 		return ['workbench.view.explorer', 'workbench.view.search', 'workbench.view.scm', 'workbench.view.debug', 'workbench.view.extensions'];
 	}
 
-	private createMenuButton(container: HTMLElement): void {
-		const menuButton = document.createElement('div');
-		menuButton.className = 'action-item menu-button';
-		menuButton.setAttribute('role', 'button');
-		menuButton.setAttribute('aria-label', 'Menu');
-		menuButton.setAttribute('tabindex', '0');
-
-		const iconContainer = document.createElement('div');
-		iconContainer.className = 'action-label';
-
-		const icon = document.createElement('div');
-		icon.className = 'codicon codicon-menu';
-		iconContainer.appendChild(icon);
-		menuButton.appendChild(iconContainer);
-
-		// Add click handler to show menu
-		menuButton.addEventListener('click', (e) => {
-			this.showMenu(e);
-		});
-
-		// Add keyboard handler
-		menuButton.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter' || e.key === ' ') {
-				e.preventDefault();
-				this.showMenu(e);
-			}
-		});
-
-		container.appendChild(menuButton);
-		console.log('[MobileSidebar] Menu button added');
-	}
-
-	private showMenu(e: MouseEvent | KeyboardEvent): void {
-		const target = e.target as HTMLElement;
-
-		// Use the context menu service's built-in menu handling which properly handles mnemonics
-		this.contextMenuService.showContextMenu({
-			getAnchor: () => target,
-			menuId: MenuId.MenubarMainMenu,
-			menuActionOptions: {
-				renderShortTitle: true  // Use short titles for mobile context
-			},
-			contextKeyService: this.contextKeyService,
-			// Let the context menu service handle mnemonic processing automatically
-		});
-	}
 
 	override dispose(): void {
 		if (this.embeddedHost) {
