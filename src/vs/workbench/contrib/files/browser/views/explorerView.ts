@@ -75,8 +75,13 @@ function hasExpandedRootChild(tree: WorkbenchCompressibleAsyncDataTree<ExplorerI
  */
 function hasExpandedNode(tree: WorkbenchCompressibleAsyncDataTree<ExplorerItem | ExplorerItem[], ExplorerItem, FuzzyScore>, treeInput: ExplorerItem[]): boolean {
 	for (const folder of treeInput) {
-		if (tree.hasNode(folder) && !tree.isCollapsed(folder)) {
-			return true;
+		try {
+			if (tree.hasNode(folder) && !tree.isCollapsed(folder)) {
+				return true;
+			}
+		} catch (e) {
+			// Node might not exist in tree yet, continue checking others
+			continue;
 		}
 	}
 	return false;
@@ -958,7 +963,12 @@ export class ExplorerView extends ViewPane implements IExplorerView {
 		}
 		const treeInputArray = Array.isArray(treeInput) ? treeInput : Array.from(treeInput.children.values());
 		// Has collapsible root when anything is expanded
-		this.viewHasSomeCollapsibleRootItem.set(hasExpandedNode(this.tree, treeInputArray));
+		try {
+			this.viewHasSomeCollapsibleRootItem.set(hasExpandedNode(this.tree, treeInputArray));
+		} catch (e) {
+			// Tree might not have the nodes yet, default to false
+			this.viewHasSomeCollapsibleRootItem.set(false);
+		}
 		// synchronize state to cache
 		this.storeTreeViewState();
 	}

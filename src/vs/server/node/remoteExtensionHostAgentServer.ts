@@ -99,6 +99,9 @@ class RemoteExtensionHostAgentServer extends Disposable implements IServerAPI {
 				: null
 		);
 		this._logService.info(`Extension host agent started.`);
+		this._logService.info(`Server base path: ${this._serverBasePath}`);
+		this._logService.info(`Server product path: ${this._serverProductPath}`);
+		this._logService.info(`Web client server: ${this._webClientServer}`);
 
 		this._waitThenShutdown(true);
 	}

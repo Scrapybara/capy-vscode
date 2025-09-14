@@ -1263,6 +1263,9 @@ const timelineUnpin = registerIcon('timeline-unpin', Codicon.pinned, localize('t
 
 class TimelinePaneCommands extends Disposable {
 	private readonly sourceDisposables: DisposableStore;
+	private static commandsRegistered = false;
+	private static activePane: TimelinePane | undefined;
+	private static registeredSourceCommands = new Set<string>();
 
 	constructor(
 		private readonly pane: TimelinePane,
@@ -1275,28 +1278,40 @@ class TimelinePaneCommands extends Disposable {
 
 		this._register(this.sourceDisposables = new DisposableStore());
 
-		this._register(registerAction2(class extends Action2 {
-			constructor() {
-				super({
-					id: 'timeline.refresh',
-					title: localize2('refresh', "Refresh"),
-					icon: timelineRefresh,
-					category: localize2('timeline', "Timeline"),
-					menu: {
-						id: MenuId.TimelineTitle,
-						group: 'navigation',
-						order: 99,
-					}
-				});
-			}
-			run(accessor: ServicesAccessor, ...args: any[]) {
-				pane.reset();
-			}
-		}));
+		// Set the active pane for command handlers
+		TimelinePaneCommands.activePane = pane;
 
-		this._register(CommandsRegistry.registerCommand('timeline.toggleFollowActiveEditor',
-			(accessor: ServicesAccessor, ...args: any[]) => pane.followActiveEditor = !pane.followActiveEditor
-		));
+		// Register commands only once globally
+		if (!TimelinePaneCommands.commandsRegistered) {
+			TimelinePaneCommands.commandsRegistered = true;
+
+			registerAction2(class extends Action2 {
+				constructor() {
+					super({
+						id: 'timeline.refresh',
+						title: localize2('refresh', "Refresh"),
+						icon: timelineRefresh,
+						category: localize2('timeline', "Timeline"),
+						menu: {
+							id: MenuId.TimelineTitle,
+							group: 'navigation',
+							order: 99,
+						}
+					});
+				}
+				run(accessor: ServicesAccessor, ...args: any[]) {
+					TimelinePaneCommands.activePane?.reset();
+				}
+			});
+
+			CommandsRegistry.registerCommand('timeline.toggleFollowActiveEditor',
+				(accessor: ServicesAccessor, ...args: any[]) => {
+					if (TimelinePaneCommands.activePane) {
+						TimelinePaneCommands.activePane.followActiveEditor = !TimelinePaneCommands.activePane.followActiveEditor;
+					}
+				}
+			);
+		}
 
 		this._register(MenuRegistry.appendMenuItem(MenuId.TimelineTitle, ({
 			command: {
@@ -1349,29 +1364,44 @@ class TimelinePaneCommands extends Disposable {
 
 		const excluded = new Set(JSON.parse(this.storageService.get('timeline.excludeSources', StorageScope.PROFILE, '[]')));
 		for (const source of this.timelineService.getSources()) {
-			this.sourceDisposables.add(registerAction2(class extends Action2 {
-				constructor() {
-					super({
-						id: `timeline.toggleExcludeSource:${source.id}`,
-						title: source.label,
-						menu: {
-							id: MenuId.TimelineFilterSubMenu,
-							group: 'navigation',
-						},
-						toggled: ContextKeyExpr.regex(`timelineExcludeSources`, new RegExp(`\\b${escapeRegExpCharacters(source.id)}\\b`)).negate()
-					});
-				}
-				run(accessor: ServicesAccessor, ...args: any[]) {
-					if (excluded.has(source.id)) {
-						excluded.delete(source.id);
-					} else {
-						excluded.add(source.id);
-					}
+			const commandId = `timeline.toggleExcludeSource:${source.id}`;
 
-					const storageService = accessor.get(IStorageService);
-					storageService.store('timeline.excludeSources', JSON.stringify([...excluded.keys()]), StorageScope.PROFILE, StorageTarget.USER);
-				}
-			}));
+			// Only register if not already registered
+			if (!TimelinePaneCommands.registeredSourceCommands.has(commandId)) {
+				TimelinePaneCommands.registeredSourceCommands.add(commandId);
+
+				this.sourceDisposables.add(registerAction2(class extends Action2 {
+					constructor() {
+						super({
+							id: commandId,
+							title: source.label,
+							menu: {
+								id: MenuId.TimelineFilterSubMenu,
+								group: 'navigation',
+							},
+							toggled: ContextKeyExpr.regex(`timelineExcludeSources`, new RegExp(`\\b${escapeRegExpCharacters(source.id)}\\b`)).negate()
+						});
+					}
+					run(accessor: ServicesAccessor, ...args: any[]) {
+						if (excluded.has(source.id)) {
+							excluded.delete(source.id);
+						} else {
+							excluded.add(source.id);
+						}
+
+						const storageService = accessor.get(IStorageService);
+						storageService.store('timeline.excludeSources', JSON.stringify([...excluded.keys()]), StorageScope.PROFILE, StorageTarget.USER);
+					}
+				}));
+			}
 		}
+	}
+
+	override dispose(): void {
+		// Clear the active pane reference if it's this instance
+		if (TimelinePaneCommands.activePane === this.pane) {
+			TimelinePaneCommands.activePane = undefined;
+		}
+		super.dispose();
 	}
 }

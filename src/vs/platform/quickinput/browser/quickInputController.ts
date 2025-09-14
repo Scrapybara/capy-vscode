@@ -854,7 +854,7 @@ export class QuickInputController extends Disposable {
 	private updateLayout() {
 		if (this.ui && this.isVisible()) {
 			const style = this.ui.container.style;
-			const width = Math.min(this.dimension!.width * 0.62 /* golden cut */, QuickInputController.MAX_WIDTH);
+			const width = Math.min(this.dimension!.width < 768 ? this.dimension!.width - 16 : this.dimension!.width * 0.62 /* golden cut */, QuickInputController.MAX_WIDTH);
 			style.width = width + 'px';
 
 			// Position
