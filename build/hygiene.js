@@ -32,17 +32,6 @@ function hygiene(some, linting = true) {
 
 	let errorCount = 0;
 
-	const productJson = es.through(function (file) {
-		const product = JSON.parse(file.contents.toString('utf8'));
-
-		if (product.extensionsGallery) {
-			console.error(`product.json: Contains 'extensionsGallery'`);
-			errorCount++;
-		}
-
-		this.emit('data', file);
-	});
-
 	const unicode = es.through(function (file) {
 		/** @type {string[]} */
 		const lines = file.contents.toString('utf8').split(/\r\n|\r|\n/);
@@ -150,7 +139,6 @@ function hygiene(some, linting = true) {
 		input = some;
 	}
 
-	const productJsonFilter = filter('product.json', { restore: true });
 	const snapshotFilter = filter(['**', '!**/*.snap', '!**/*.snap.actual']);
 	const yarnLockFilter = filter(['**', '!**/yarn.lock']);
 	const unicodeFilterStream = filter(unicodeFilter, { restore: true });
@@ -159,9 +147,6 @@ function hygiene(some, linting = true) {
 		.pipe(filter((f) => !f.stat.isDirectory()))
 		.pipe(snapshotFilter)
 		.pipe(yarnLockFilter)
-		.pipe(productJsonFilter)
-		.pipe(process.env['BUILD_SOURCEVERSION'] ? es.through() : productJson)
-		.pipe(productJsonFilter.restore)
 		.pipe(unicodeFilterStream)
 		.pipe(unicode)
 		.pipe(unicodeFilterStream.restore)
