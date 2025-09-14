@@ -200,10 +200,15 @@
 	"remote.extensionKind": {
 		"msjsdiag.debugger-for-chrome": "workspace"
 	},
-	"terminal.integrated.suggest.enabled": true,
-	"application.experimental.rendererProfiling": true,
+	// "application.experimental.rendererProfiling": true, // https://github.com/microsoft/vscode/issues/265654
 
 	"editor.aiStats.enabled": true, // Team selfhosting on ai stats
 	"chat.checkpoints.showFileChanges": true,
-	"svg.preview.background": "white"
+	"svg.preview.background": "white",
+	"chat.emptyState.history.enabled": true,
+	"github.copilot.chat.advanced.taskTools.enabled": true,
+	"chat.promptFilesRecommendations": {
+		"plan-fast": true,
+		"plan-deep": true
+	}
 }
